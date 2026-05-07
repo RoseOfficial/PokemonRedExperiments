@@ -1,0 +1,89 @@
+- name: PALLET_TOWN
+  map_id: 0x00
+
+- name: VIRIDIAN_CITY
+  map_id: 0x01
+
+- name: PEWTER_CITY
+  map_id: 0x02
+
+- name: CERULEAN_CITY
+  map_id: 0x03
+
+- name: ROUTE_1
+  map_id: 0x0C
+
+- name: ROUTE_2
+  map_id: 0x0D
+
+- name: ROUTE_3
+  map_id: 0x0E
+
+- name: ROUTE_4
+  map_id: 0x0F
+
+- name: ROUTE_5
+  map_id: 0x10
+  blockers: [GUARD_HOUSE_5_6]
+
+- name: ROUTE_6
+  map_id: 0x11
+
+- name: ROUTE_9
+  map_id: 0x14
+
+- name: ROUTE_10
+  map_id: 0x15
+
+- name: ROUTE_16
+  map_id: 0x1B
+
+- name: ROUTE_17
+  map_id: 0x1C
+
+- name: ROUTE_18
+  map_id: 0x1D
+
+- name: ROUTE_22
+  map_id: 0x21
+
+- name: ROUTE_23
+  map_id: 0x22
+
+- name: ROUTE_24
+  map_id: 0x23
+
+- name: ROUTE_25
+  map_id: 0x24
+
+- name: VIRIDIAN_FOREST
+  map_id: 0x33
+
+- name: MT_MOON
+  map_id: 0x3B
+  blockers: []
+
+- name: ROCK_TUNNEL
+  map_id: 0x52
+  blockers: [FLASH]
+
+- name: POWER_PLANT
+  map_id: 0x53
+  blockers: [SURF]
+
+- name: SEAFOAM_ISLANDS
+  map_id: 0xC1
+  blockers: [SURF, STRENGTH]
+
+- name: VICTORY_ROAD
+  map_id: 0x6C
+  blockers: [STRENGTH, SURF]
+
+- name: OAKS_LAB
+  map_id: 0x28
+
+- name: PEWTER_GYM
+  map_id: 0x36
+
+- name: CERULEAN_GYM
+  map_id: 0x41

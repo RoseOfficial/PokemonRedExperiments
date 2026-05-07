@@ -1,0 +1,11 @@
+- name: POKEBALL
+  item_id: 0x04
+  sources: [POKEMART_ANY]
+
+- name: POTION
+  item_id: 0x14
+  sources: [POKEMART_ANY]
+
+- name: BICYCLE
+  item_id: 0x06
+  sources: [BIKE_SHOP_CERULEAN]

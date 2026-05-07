@@ -1,0 +1,198 @@
+- name: BULBASAUR
+  species_id: 0x99
+  encounter_method: gift
+  encounter_zones: [OAKS_LAB]
+  tags: [starter, grass, poison]
+
+- name: IVYSAUR
+  species_id: 0x09
+  encounter_method: trade
+  evolution_from: BULBASAUR
+  evolution_method: "level:16"
+  tags: [grass, poison]
+
+- name: VENUSAUR
+  species_id: 0x9A
+  encounter_method: trade
+  evolution_from: IVYSAUR
+  evolution_method: "level:32"
+  tags: [grass, poison]
+
+- name: CHARMANDER
+  species_id: 0xB0
+  encounter_method: gift
+  encounter_zones: [OAKS_LAB]
+  tags: [starter, fire]
+
+- name: CHARMELEON
+  species_id: 0xB2
+  encounter_method: trade
+  evolution_from: CHARMANDER
+  evolution_method: "level:16"
+  tags: [fire]
+
+- name: CHARIZARD
+  species_id: 0xB4
+  encounter_method: trade
+  evolution_from: CHARMELEON
+  evolution_method: "level:36"
+  tags: [fire, flying]
+
+- name: SQUIRTLE
+  species_id: 0xB1
+  encounter_method: gift
+  encounter_zones: [OAKS_LAB]
+  tags: [starter, water]
+
+- name: WARTORTLE
+  species_id: 0xB3
+  encounter_method: trade
+  evolution_from: SQUIRTLE
+  evolution_method: "level:16"
+  tags: [water]
+
+- name: BLASTOISE
+  species_id: 0x1C
+  encounter_method: trade
+  evolution_from: WARTORTLE
+  evolution_method: "level:36"
+  tags: [water]
+
+- name: PIDGEY
+  species_id: 0x24
+  encounter_method: wild
+  encounter_zones: [ROUTE_1, ROUTE_2, ROUTE_22, VIRIDIAN_FOREST]
+  tags: [normal, flying, common]
+
+- name: PIDGEOTTO
+  species_id: 0x96
+  encounter_method: wild
+  encounter_zones: [ROUTE_5, ROUTE_6, ROUTE_24, ROUTE_25]
+  evolution_from: PIDGEY
+  evolution_method: "level:18"
+  tags: [normal, flying]
+
+- name: RATTATA
+  species_id: 0xA5
+  encounter_method: wild
+  encounter_zones: [ROUTE_1, ROUTE_2, ROUTE_22]
+  tags: [normal, common]
+
+- name: RATICATE
+  species_id: 0xA6
+  encounter_method: wild
+  encounter_zones: [ROUTE_16, ROUTE_17, ROUTE_18]
+  evolution_from: RATTATA
+  evolution_method: "level:20"
+  tags: [normal]
+
+- name: CATERPIE
+  species_id: 0x7B
+  encounter_method: wild
+  encounter_zones: [VIRIDIAN_FOREST, ROUTE_25]
+  tags: [bug, common]
+
+- name: METAPOD
+  species_id: 0x7C
+  encounter_method: wild
+  encounter_zones: [VIRIDIAN_FOREST]
+  evolution_from: CATERPIE
+  evolution_method: "level:7"
+  tags: [bug]
+
+- name: BUTTERFREE
+  species_id: 0x7D
+  encounter_method: trade
+  evolution_from: METAPOD
+  evolution_method: "level:10"
+  tags: [bug, flying]
+
+- name: WEEDLE
+  species_id: 0x70
+  encounter_method: wild
+  encounter_zones: [VIRIDIAN_FOREST, ROUTE_25]
+  tags: [bug, poison, common]
+
+- name: KAKUNA
+  species_id: 0x71
+  encounter_method: wild
+  encounter_zones: [VIRIDIAN_FOREST]
+  evolution_from: WEEDLE
+  evolution_method: "level:7"
+  tags: [bug, poison]
+
+- name: BEEDRILL
+  species_id: 0x72
+  encounter_method: trade
+  evolution_from: KAKUNA
+  evolution_method: "level:10"
+  tags: [bug, poison]
+
+- name: SPEAROW
+  species_id: 0x05
+  encounter_method: wild
+  encounter_zones: [ROUTE_3, ROUTE_22]
+  tags: [normal, flying]
+
+- name: FEAROW
+  species_id: 0x23
+  encounter_method: wild
+  encounter_zones: [ROUTE_9, ROUTE_10]
+  evolution_from: SPEAROW
+  evolution_method: "level:20"
+  tags: [normal, flying]
+
+- name: EKANS
+  species_id: 0x6D
+  encounter_method: wild
+  encounter_zones: [ROUTE_4, ROUTE_9]
+  tags: [poison, red_exclusive]
+
+- name: SANDSHREW
+  species_id: 0x60
+  encounter_method: wild
+  encounter_zones: [ROUTE_4, ROUTE_23]
+  tags: [ground, red_exclusive]
+
+- name: NIDORAN_M
+  species_id: 0x0F
+  encounter_method: wild
+  encounter_zones: [ROUTE_3, ROUTE_4, ROUTE_22]
+  tags: [poison]
+
+- name: NIDORAN_F
+  species_id: 0x03
+  encounter_method: wild
+  encounter_zones: [ROUTE_3, ROUTE_4, ROUTE_22]
+  tags: [poison]
+
+- name: PIKACHU
+  species_id: 0x54
+  encounter_method: wild
+  encounter_zones: [VIRIDIAN_FOREST, POWER_PLANT]
+  tags: [electric, mascot]
+
+- name: GEODUDE
+  species_id: 0xA9
+  encounter_method: wild
+  encounter_zones: [MT_MOON, ROCK_TUNNEL, VICTORY_ROAD]
+  tags: [rock, ground]
+
+- name: MANKEY
+  species_id: 0x39
+  encounter_method: wild
+  encounter_zones: [ROUTE_22]
+  tags: [fighting]
+
+- name: ZUBAT
+  species_id: 0x6B
+  encounter_method: wild
+  encounter_zones: [MT_MOON, ROCK_TUNNEL, SEAFOAM_ISLANDS]
+  tags: [poison, flying]
+
+- name: ODDISH
+  species_id: 0x47
+  encounter_method: wild
+  encounter_zones: [ROUTE_5, ROUTE_6, ROUTE_24, ROUTE_25]
+  required_badges: [CASCADE]
+  tags: [grass, poison]

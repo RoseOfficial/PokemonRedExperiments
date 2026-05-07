@@ -1,0 +1,7 @@
+- name: BROCK
+  location: PEWTER_GYM
+  party: [GEODUDE, ONIX]
+
+- name: MISTY
+  location: CERULEAN_GYM
+  party: [STARYU, STARMIE]
