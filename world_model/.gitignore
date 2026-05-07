@@ -1,0 +1,13 @@
+# Editable-install build metadata
+*.egg-info/
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime artifacts (per spec Section 9.1)
+data/
+runs/
