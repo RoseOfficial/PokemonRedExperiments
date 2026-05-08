@@ -34,12 +34,15 @@ from pokemon_planner.data.trajectory import Trajectory, TrajectoryStep  # noqa: 
 from pokemon_planner.env import read_state  # noqa: E402
 
 
-# Map v2's 7 actions to our 9-action space (per spec Section 3.4)
+# v2's action space (from v2/red_gym_env_v2.py): 0=DOWN, 1=LEFT, 2=RIGHT,
+# 3=UP, 4=A, 5=B, 6=START. Our 9-action space adopts the same order, with
+# 7=SELECT and 8=NO-OP appended (these never appear in v2 PPO output but
+# are reserved for Phase 1b/1c agents that exercise the full button range).
 V2_ACTION_TO_OURS: dict[int, int] = {
-    0: 0,  # DOWN   (v2 index 0)
-    1: 2,  # LEFT   (v2 index 1)
-    2: 3,  # RIGHT  (v2 index 2)
-    3: 1,  # UP     (v2 index 3)
+    0: 0,  # DOWN
+    1: 1,  # LEFT
+    2: 2,  # RIGHT
+    3: 3,  # UP
     4: 4,  # A
     5: 5,  # B
     6: 6,  # START
