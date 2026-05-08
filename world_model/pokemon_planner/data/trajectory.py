@@ -9,20 +9,17 @@ vs. ~3KB JSON. See spec Section 3.5.
 """
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
 import msgpack
 
 from pokemon_planner.state import (
-    BAG_SLOTS,
     BattleState,
     BagSlot,
-    EVENT_FLAGS_BYTES,
     GameState,
     PartySlot,
-    PARTY_MAX,
-    TILE_COLLISION_BYTES,
 )
 
 
@@ -32,7 +29,8 @@ class TrajectoryStep:
     action: int
     reward: float
     done: bool
-    info: dict[str, Any] = field(default_factory=dict)
+    info: Mapping[str, Any] = field(default_factory=dict)
+    """Read-only diagnostic metadata. Do not mutate after construction."""
 
 
 @dataclass(frozen=True)
