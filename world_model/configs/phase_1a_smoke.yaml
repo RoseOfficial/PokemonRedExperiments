@@ -1,0 +1,43 @@
+# Smoke-test config — 100 steps, tiny model. Verifies end-to-end wiring on real data.
+model:
+  d_model: 64
+  latent_dim: 32
+  goal_emb_dim: 64
+  action_dim: 9
+  encoder_layers: 2
+  encoder_heads: 2
+  dynamics_layers: 2
+  dynamics_heads: 2
+  prediction_layers: 2
+  prediction_heads: 2
+  ffn_expansion: 2
+  dropout: 0.0
+training:
+  batch_size: 4
+  k_unroll: 2
+  lr: 3.0e-4
+  warmup_steps: 0
+  total_steps: 100
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+  ema_decay: 0.999
+  fp16: false
+  gradient_checkpointing: false
+  loss_weights: {obs: 1.0, value: 0.25, policy: 1.0, reward: 0.5, consistency: 0.1}
+eval:
+  every_n_steps: 50
+  batch_size: 8
+  max_batches: 2
+  dod_thresholds: {acc/map_id: 0.80, acc/x: 0.80, acc/y: 0.80, acc/party_species_slot_0: 0.80}
+replay:
+  root: data/replay_buffer
+  source_priorities: {demo: 0.3}
+  prefetch_workers: 2
+checkpoint:
+  save_every_n_steps: 50
+  keep_last_n: 2
+  milestone_every_n_steps: 100
+wandb:
+  project: pokemon-world-model-smoke
+  run_name_prefix: phase1a-smoke
+  log_every_n_steps: 10
