@@ -166,38 +166,41 @@ def run_training_loop(
                 wandb_logger.log({f"loss/{k}": v for k, v in components.items()}, step=step)
 
         if step > 0 and step % eval_every == 0:
+            eval_skipped = False
             try:
                 eval_batch = eval_replay.sample_batch(config.batch_size * 2, k_unroll=1)
             except RuntimeError:
                 print(f"[train] step={step} skipping eval (eval buffer too small)")
-                continue
-            eval_states = [w[0] for w in eval_batch.states]
-            eval_next_states = [w[1] for w in eval_batch.states]
-            eval_actions = torch.tensor(
-                [w[0] for w in eval_batch.actions], dtype=torch.long, device=device,
-            )
-            eval_goal_emb = goal_embedder.batch(len(eval_states)).detach()
+                eval_skipped = True
 
-            metrics = run_eval(
-                model=model,
-                eval_states=eval_states, eval_next_states=eval_next_states,
-                eval_actions=eval_actions, eval_goal_embs=eval_goal_emb,
-                batch_size=config.batch_size, max_batches=20,
-            )
-            passes_gate = check_dod_gate(metrics, gate)
-            print(
-                f"[train] step={step} eval: "
-                f"map={metrics.get('acc/map_id', 0):.3f} "
-                f"x={metrics.get('acc/x', 0):.3f} "
-                f"y={metrics.get('acc/y', 0):.3f} "
-                f"species={metrics.get('acc/party_species_slot_0', 0):.3f} "
-                f"DoD_gate={'PASS' if passes_gate else 'fail'}"
-            )
-            if wandb_logger is not None:
-                wandb_logger.log(
-                    {**metrics, "eval/passes_doD_gate": int(passes_gate)},
-                    step=step,
+            if not eval_skipped:
+                eval_states = [w[0] for w in eval_batch.states]
+                eval_next_states = [w[1] for w in eval_batch.states]
+                eval_actions = torch.tensor(
+                    [w[0] for w in eval_batch.actions], dtype=torch.long, device=device,
                 )
+                eval_goal_emb = goal_embedder.batch(len(eval_states)).detach()
+
+                metrics = run_eval(
+                    model=model,
+                    eval_states=eval_states, eval_next_states=eval_next_states,
+                    eval_actions=eval_actions, eval_goal_embs=eval_goal_emb,
+                    batch_size=config.batch_size, max_batches=20,
+                )
+                passes_gate = check_dod_gate(metrics, gate)
+                print(
+                    f"[train] step={step} eval: "
+                    f"map={metrics.get('acc/map_id', 0):.3f} "
+                    f"x={metrics.get('acc/x', 0):.3f} "
+                    f"y={metrics.get('acc/y', 0):.3f} "
+                    f"species={metrics.get('acc/party_species_slot_0', 0):.3f} "
+                    f"DoD_gate={'PASS' if passes_gate else 'fail'}"
+                )
+                if wandb_logger is not None:
+                    wandb_logger.log(
+                        {**metrics, "eval/passes_doD_gate": int(passes_gate)},
+                        step=step,
+                    )
 
         if step > 0 and step % save_every == 0:
             ckpt_path = checkpoint_dir / f"checkpoint_{step:08d}.pt"

@@ -83,5 +83,12 @@ class DummyGoalEmbedding(nn.Module):
         return self.vec
 
     def batch(self, batch_size: int) -> Tensor:
-        """Returns the dummy embedding repeated for a batch, shape (batch_size, embed_dim)."""
-        return self.vec.unsqueeze(0).expand(batch_size, -1).contiguous()
+        """Returns the dummy embedding repeated for a batch.
+
+        The output is .detach()'ed because Phase 1a does not train the
+        embedding via the optimizer (the training loop only optimizes
+        model.parameters()). Phase 1b retrains the f-head with real
+        goal-conditioned MCTS targets, at which point this entire class
+        is replaced with GoalEmbedder.
+        """
+        return self.vec.detach().unsqueeze(0).expand(batch_size, -1).contiguous()
