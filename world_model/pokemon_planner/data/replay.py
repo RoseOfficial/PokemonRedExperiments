@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 import pyarrow as pa
@@ -49,17 +50,25 @@ class Batch:
     sources: list[str]                # one per batch element
 
 
+class _RowEntry(NamedTuple):
+    """One row in the in-memory replay index."""
+
+    file_idx: int
+    row_in_file: int
+    episode_id: int
+    step_index_in_episode: int
+    episode_length: int
+    priority: float
+
+
 @dataclass
 class _Index:
-    """In-memory index over all rows in the Parquet shards.
-
-    Each entry: (file_idx, row_in_file, episode_id, step_index_in_episode,
-                 episode_length, priority).
-    """
+    """In-memory index over all rows in the Parquet shards."""
 
     file_paths: list[Path] = field(default_factory=list)
-    rows: list[tuple[int, int, int, int, int, float]] = field(default_factory=list)
+    rows: list[_RowEntry] = field(default_factory=list)
     seen_episodes: set[tuple[str, int]] = field(default_factory=set)
+    _cached_weights: np.ndarray | None = None  # normalized priorities, lazy
 
 
 class ReplayBuffer:
@@ -124,8 +133,18 @@ class ReplayBuffer:
         file_idx = len(self._index.file_paths)
         self._index.file_paths.append(shard_path)
         for i in range(traj.length):
-            self._index.rows.append((file_idx, i, traj.episode_id, i, traj.length, priority))
+            self._index.rows.append(
+                _RowEntry(
+                    file_idx=file_idx,
+                    row_in_file=i,
+                    episode_id=traj.episode_id,
+                    step_index_in_episode=i,
+                    episode_length=traj.length,
+                    priority=priority,
+                )
+            )
         self._index.seen_episodes.add(key)
+        self._index._cached_weights = None  # invalidate on new data
 
     def sample_batch(self, batch_size: int, k_unroll: int) -> Batch:
         """Sample B trajectory windows of length k+1.
@@ -208,17 +227,36 @@ class ReplayBuffer:
             priorities = t.column("priority").to_pylist()
             ep_length = len(ep_ids)
             for i, (eid, _src, prio) in enumerate(zip(ep_ids, sources, priorities)):
-                self._index.rows.append((file_idx, i, eid, i, ep_length, prio))
+                self._index.rows.append(
+                    _RowEntry(
+                        file_idx=file_idx,
+                        row_in_file=i,
+                        episode_id=eid,
+                        step_index_in_episode=i,
+                        episode_length=ep_length,
+                        priority=prio,
+                    )
+                )
             if ep_ids:
                 self._index.seen_episodes.add((sources[0], ep_ids[0]))
 
     def _weighted_sample_index(self) -> int:
-        """Draw a row index proportional to per-row priority weights."""
+        """Draw a row index proportional to per-row priority weights.
+
+        Normalizes once and caches; cache is invalidated by :meth:`add`.
+        """
         if not self._index.rows:
             raise RuntimeError("ReplayBuffer is empty")
-        priorities = np.array([r[5] for r in self._index.rows], dtype=np.float64)
-        priorities = priorities / priorities.sum()
-        return int(np.random.choice(len(self._index.rows), p=priorities))
+        if self._index._cached_weights is None:
+            priorities = np.array([r.priority for r in self._index.rows], dtype=np.float64)
+            total = priorities.sum()
+            if total <= 0:
+                raise RuntimeError(
+                    "ReplayBuffer has total priority 0. All entries have priority=0; "
+                    "cannot sample. Use uniform priority or assign non-zero weights."
+                )
+            self._index._cached_weights = priorities / total
+        return int(np.random.choice(len(self._index.rows), p=self._index._cached_weights))
 
     def _read_window(
         self,
@@ -233,13 +271,14 @@ class ReplayBuffer:
         if idx + length > len(self._index.rows):
             return None
         # All rows must be in the same file and same episode
-        file_idx, _, _, start_step, ep_length, _ = self._index.rows[idx]
-        if start_step + length > ep_length:
+        start_entry = self._index.rows[idx]
+        file_idx = start_entry.file_idx
+        start_row_in_file = start_entry.row_in_file
+        if start_entry.step_index_in_episode + length > start_entry.episode_length:
             return None
         # Verify every row in the window belongs to the same shard
         for offset in range(1, length):
-            row_file_idx = self._index.rows[idx + offset][0]
-            if row_file_idx != file_idx:
+            if self._index.rows[idx + offset].file_idx != file_idx:
                 return None
 
         # Read the shard once for the whole window
@@ -250,7 +289,7 @@ class ReplayBuffer:
         rewards: list[float] = []
         mc_returns: list[float] = []
         for offset in range(length):
-            step_in_file = self._index.rows[idx + offset][1]
+            step_in_file = self._index.rows[idx + offset].row_in_file
             states.append(
                 deserialize_state(table.column("state_bytes")[step_in_file].as_py())
             )
@@ -258,5 +297,5 @@ class ReplayBuffer:
                 actions.append(int(table.column("action")[step_in_file].as_py()))
                 rewards.append(float(table.column("reward")[step_in_file].as_py()))
                 mc_returns.append(float(table.column("mc_return")[step_in_file].as_py()))
-        source = table.column("source")[0].as_py()
+        source = table.column("source")[start_row_in_file].as_py()
         return states, actions, rewards, mc_returns, source
