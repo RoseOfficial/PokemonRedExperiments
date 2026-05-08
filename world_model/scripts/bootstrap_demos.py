@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -87,7 +88,8 @@ def extract_one_episode(
     max_steps: int,
     buffer: ReplayBuffer,
     source_name: str | None = None,
-) -> Trajectory:
+    session_root: Path | None = None,
+) -> Trajectory | None:
     """Run one episode of v2 PPO and capture our typed states. Idempotent.
 
     Args:
@@ -99,9 +101,12 @@ def extract_one_episode(
         max_steps: Maximum number of env steps to run.
         buffer: ReplayBuffer instance to persist to.
         source_name: If None, inferred from ckpt_path.name via SOURCES.
+        session_root: Root directory for per-episode PyBoy session subdirs.
+            If None, a fresh OS temp dir is created. Pass tmp_path in tests.
 
     Returns:
-        The Trajectory from this episode (may be a stub if already extracted).
+        The extracted Trajectory, or None if (source_name, episode_id) was
+        already in the buffer (idempotent skip).
     """
     from stable_baselines3 import PPO
     from red_gym_env_v2 import RedGymEnv  # type: ignore  # from v2/
@@ -111,11 +116,13 @@ def extract_one_episode(
 
     # Skip if already extracted (idempotency)
     if (source_name, episode_id) in buffer._index.seen_episodes:
-        return _reconstruct_from_disk(buffer, source_name, episode_id)
+        return None
 
-    # Build the v2 env config; mirror v2/baseline_fast_v2.py's defaults.
-    # session_path must be a Path (RedGymEnv calls .mkdir() on it).
-    session_path = Path("/tmp/poke_bootstrap_session")
+    # Per-episode session subdir — avoids cross-episode state accumulation and
+    # works on Windows (Path("/tmp/...") resolves to C:\tmp which may not exist).
+    if session_root is None:
+        session_root = Path(tempfile.mkdtemp(prefix="poke_bootstrap_"))
+    session_path = session_root / source_name / f"ep_{episode_id}"
     session_path.mkdir(parents=True, exist_ok=True)
 
     env_config = {
@@ -133,7 +140,7 @@ def extract_one_episode(
         "debug": False,
         "sim_frame_dist": 2_000_000.0,
         "use_screen_explore": True,
-        "reward_scale": 4,
+        "reward_scale": 0.5,    # matches v2/baseline_fast_v2.py training config
         "extra_buttons": False,
         "explore_weight": 3,
     }
@@ -147,7 +154,10 @@ def extract_one_episode(
         os.chdir(_orig_cwd)
     obs, _ = env.reset(seed=seed)
 
-    model = PPO.load(str(ckpt_path), env=env, device="cpu")  # CPU is fine for inference
+    model = PPO.load(
+        str(ckpt_path), env=env, device="cpu",
+        custom_objects={"lr_schedule": 0, "clip_range": 0},
+    )
 
     steps: list[TrajectoryStep] = []
     done = False
@@ -189,17 +199,6 @@ def extract_one_episode(
     )
     buffer.add(traj, priority=0.3)
     return traj
-
-
-def _reconstruct_from_disk(buffer: ReplayBuffer, source: str, episode_id: int) -> Trajectory:
-    """Return a Trajectory stub for an already-persisted episode.
-
-    Used only for the idempotency path -- the caller just needs a non-empty
-    Trajectory back to know the episode was already extracted.
-    Callers that care only about idempotency (test_extract_idempotent) check
-    buf.size rather than traj.length, so an empty stub is sufficient.
-    """
-    return Trajectory(steps=(), source=source, episode_id=episode_id, seed=0)
 
 
 def main() -> None:
@@ -248,10 +247,11 @@ def main() -> None:
             print(f"[bootstrap] SKIP {source}: checkpoint not found at {ckpt}")
             continue
         print(f"[bootstrap] === Source: {source} ===")
+        session_root = Path(tempfile.mkdtemp(prefix="poke_bootstrap_"))
         for episode_id in range(args.max_episodes):
             seed = (hash(source) ^ episode_id) & 0x7FFF_FFFF
             try:
-                traj = extract_one_episode(
+                result = extract_one_episode(
                     ckpt_path=ckpt,
                     rom_path=rom,
                     init_state_path=init_state,
@@ -260,8 +260,12 @@ def main() -> None:
                     max_steps=args.max_steps,
                     buffer=buffer,
                     source_name=source,
+                    session_root=session_root,
                 )
-                print(f"[bootstrap] {source} ep {episode_id}: {traj.length} steps")
+                if result is None:
+                    print(f"[bootstrap] {source} ep {episode_id}: skipped (already extracted)")
+                else:
+                    print(f"[bootstrap] {source} ep {episode_id}: {result.length} steps")
             except Exception as exc:
                 print(f"[bootstrap] {source} ep {episode_id} FAILED: {exc}")
                 continue
