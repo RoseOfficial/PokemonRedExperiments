@@ -42,7 +42,7 @@ def _config() -> TokenizerConfig:
         num_level_buckets=10,
         num_hp_pct_buckets=10,
         num_qty_buckets=10,
-        num_status_buckets=8,
+        num_status_buckets=256,
         num_moves=256,
         num_money_buckets=16,
         num_time_buckets=16,

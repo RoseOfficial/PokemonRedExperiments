@@ -49,7 +49,7 @@ class TokenizerConfig:
     num_level_buckets: int = 10
     num_hp_pct_buckets: int = 10
     num_qty_buckets: int = 10
-    num_status_buckets: int = 8
+    num_status_buckets: int = 256  # direct lookup over full status byte range
     num_money_buckets: int = 16
     num_time_buckets: int = 16
     num_turn_buckets: int = 16
@@ -140,12 +140,13 @@ class Tokenizer(nn.Module):
                     hp_b = _bucket(
                         slot.hp_cur * 10 // max(1, slot.hp_max), 9, self.cfg.num_hp_pct_buckets
                     )
-                    status_b = _bucket(slot.status, 7, self.cfg.num_status_buckets)
+                    # status is a raw Game Boy byte; bit-flags 4/8/16/32/64 are
+                    # meaningful distinct values — bucketing would collapse them.
                     tok = (
                         self.emb_species(torch.tensor(slot.species_id, device=device))
                         + self.emb_level(torch.tensor(lvl_b, device=device))
                         + self.emb_hp_pct(torch.tensor(hp_b, device=device))
-                        + self.emb_status(torch.tensor(status_b, device=device))
+                        + self.emb_status(torch.tensor(slot.status, device=device))
                     )
                     for m in slot.moves:
                         tok = tok + self.emb_move(torch.tensor(m, device=device))
@@ -187,13 +188,17 @@ class Tokenizer(nn.Module):
             out[b, 36] = self.emb_money(torch.tensor(money_b, device=device))
 
             # Time (37)
-            time_b = _bucket(s.time_played_frames, 255, self.cfg.num_time_buckets)
+            # 200K frames ≈ 55 min @ 60fps. Sessions longer clamp to last bucket;
+            # acceptable for Phase 1a bootstrap. Phase 1b/c may revisit with log-bucket.
+            time_b = _bucket(s.time_played_frames, 200_000, self.cfg.num_time_buckets)
             out[b, 37] = self.emb_time(torch.tensor(time_b, device=device))
 
             # Battle (38)
             if s.battle.in_battle:
                 opp_lvl_b = _bucket(s.battle.opp_level, 100, self.cfg.num_level_buckets)
-                opp_hp_b = _bucket(s.battle.opp_hp, 1000, self.cfg.num_hp_pct_buckets)
+                # opp_hp is raw battle HP (not percentage). Max plausible value ~700;
+                # 999 cap matches Pokemon Red's 3-digit HP display.
+                opp_hp_b = _bucket(s.battle.opp_hp, 999, self.cfg.num_hp_pct_buckets)
                 turn_b = _bucket(s.battle.turn, 99, self.cfg.num_turn_buckets)
                 out[b, 38] = (
                     self.emb_opp_species(torch.tensor(s.battle.opp_species_id, device=device))
