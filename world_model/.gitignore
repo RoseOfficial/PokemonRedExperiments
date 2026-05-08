@@ -9,5 +9,6 @@ __pycache__/
 .ruff_cache/
 
 # Runtime artifacts (per spec Section 9.1)
-data/
+# /data/ means only the top-level data/ dir (replay buffer storage), not pokemon_planner/data/ or docs/data/
+/data/
 runs/
