@@ -155,16 +155,57 @@ def _read_battle(pb: PyBoy) -> BattleState:
     )
 
 
-def _read_tile_collision_stub(pb: PyBoy) -> bytes:
-    """Placeholder — Phase 0 returns zeros.
+def _read_tile_id_at(pb: PyBoy, world_x: int, world_y: int) -> int | None:
+    """Read the raw tile byte (0-255) at world tile coordinate (world_x, world_y).
 
-    Real tile-collision extraction requires looking up the current tileset's
-    collision table and indexing into it via the player's overworld tile map
-    around (x, y). That logic is non-trivial and lives in a follow-up task
-    (Phase 1a Task X). For Phase 0 the schema requires the right *length*,
-    so we return 256 zeros.
+    Pokemon Red stores the current map in the Game Boy background tilemap
+    starting at BG position (0, 0).  The BG tilemap is 32x32 tiles; positions
+    outside [0, 32) in either axis are off-map and return None.
+
+    PyBoy's tile_identifier() returns a "global" tile index in [0, 512):
+      - 256-511  ->  tiles from VRAM bank at 0x9000  (Pokemon Red tile IDs 0-127)
+      - 128-255  ->  tiles from VRAM bank at 0x8800  (Pokemon Red tile IDs 128-255)
+    Pokemon Red uses LCDC addressing mode 0 (0x8800-based), so converting back
+    to the raw tile byte (0-255) stored in the BG map is:
+        raw_tile_byte = (tile_identifier - 256) % 256
     """
-    return bytes(TILE_COLLISION_BYTES)
+    if not (0 <= world_x < 32 and 0 <= world_y < 32):
+        return None
+    try:
+        identifier = pb.tilemap_background.tile_identifier(world_x, world_y)
+    except (AttributeError, IndexError):
+        return None
+    # Convert PyBoy global tile identifier to raw Pokemon Red tile byte 0-255.
+    return (identifier - 256) % 256
+
+
+def _read_tile_collision(pb: PyBoy, player_x: int, player_y: int) -> bytes:
+    """Extract a 16x16 grid of collision codes centered on the player.
+
+    See spec Section 4.  Reads the current tileset ID from RAM, looks up the
+    matching collision table from _tilesets.py, then classifies each tile.
+
+    Returns 256 bytes, row-major: out[dy * 16 + dx] = code at world position
+    (player_x + dx - 8, player_y + dy - 8), with dy/dx in [0, 16).
+    Center cell (dy=8, dx=8, index=136) is the player's own tile.
+    """
+    from pokemon_planner import _tilesets
+
+    tileset_id = pb.memory[ram.CURRENT_TILESET]
+    table = _tilesets.COLLISION_TABLES.get(tileset_id, _tilesets.DEFAULT_TABLE)
+
+    out = bytearray(TILE_COLLISION_BYTES)
+    for dy in range(16):
+        for dx in range(16):
+            world_x = player_x + dx - 8
+            world_y = player_y + dy - 8
+            tile_id = _read_tile_id_at(pb, world_x, world_y)
+            if tile_id is None:
+                code = _tilesets.COLLISION_UNKNOWN
+            else:
+                code = table.lookup(tile_id)
+            out[dy * 16 + dx] = code
+    return bytes(out)
 
 
 # ---- Public API ----
@@ -182,6 +223,10 @@ def read_state(pyboy: PyBoy) -> GameState:
         money=_read_bcd(pyboy, ram.MONEY, 3),
         time_played_frames=_read_byte(pyboy, ram.TIME_PLAYED_FRAMES),
         battle=_read_battle(pyboy),
-        tile_collision=_read_tile_collision_stub(pyboy),
+        tile_collision=_read_tile_collision(
+            pyboy,
+            _read_byte(pyboy, ram.PLAYER_X),
+            _read_byte(pyboy, ram.PLAYER_Y),
+        ),
         menu_flags=_read_byte(pyboy, ram.MENU_FLAGS),
     )
