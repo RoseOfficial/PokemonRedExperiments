@@ -155,56 +155,73 @@ def _read_battle(pb: PyBoy) -> BattleState:
     )
 
 
-def _read_tile_id_at(pb: PyBoy, world_x: int, world_y: int) -> int | None:
-    """Read the raw tile byte (0-255) at world tile coordinate (world_x, world_y).
+def _read_tile_id_at_bg(pb: PyBoy, bg_x: int, bg_y: int) -> int:
+    """Read the raw tile byte (0-255) from the BG tilemap at (bg_x, bg_y).
 
-    Pokemon Red stores the current map in the Game Boy background tilemap
-    starting at BG position (0, 0).  The BG tilemap is 32x32 tiles; positions
-    outside [0, 32) in either axis are off-map and return None.
+    bg_x/bg_y are BG-map coordinates (mod 32 — the BG is a 32x32 wrapping ring).
 
     PyBoy's tile_identifier() returns a "global" tile index in [0, 512):
-      - 256-511  ->  tiles from VRAM bank at 0x9000  (Pokemon Red tile IDs 0-127)
-      - 128-255  ->  tiles from VRAM bank at 0x8800  (Pokemon Red tile IDs 128-255)
+      - 256-511 -> VRAM bank at 0x9000 (Pokemon Red tile IDs 0-127)
+      - 128-255 -> VRAM bank at 0x8800 (Pokemon Red tile IDs 128-255)
     Pokemon Red uses LCDC addressing mode 0 (0x8800-based), so converting back
     to the raw tile byte (0-255) stored in the BG map is:
         raw_tile_byte = (tile_identifier - 256) % 256
     """
-    if not (0 <= world_x < 32 and 0 <= world_y < 32):
-        return None
     try:
-        identifier = pb.tilemap_background.tile_identifier(world_x, world_y)
+        identifier = pb.tilemap_background.tile_identifier(bg_x & 31, bg_y & 31)
     except (AttributeError, IndexError):
-        return None
-    # Convert PyBoy global tile identifier to raw Pokemon Red tile byte 0-255.
+        return 0
     return (identifier - 256) % 256
 
 
-def _read_tile_collision(pb: PyBoy, player_x: int, player_y: int) -> bytes:
+# Hardware register addresses for the GB LCD scroll registers.
+_LCD_SCX = 0xFF43   # Background scroll X in pixels (0-255)
+_LCD_SCY = 0xFF42   # Background scroll Y in pixels (0-255)
+
+# In Pokemon Red Gen 1, the player sprite is always rendered at the fixed screen
+# tile position (PLAYER_SCREEN_TILE, PLAYER_SCREEN_TILE) = (9, 9).  The BG
+# tilemap is scrolled via SCX/SCY so that the player's foot tile lands exactly
+# there.  Empirically verified: BG_x = (SCX//8 + 9) % 32 and
+# BG_y = (SCY//8 + 9) % 32 always equal the player's standing tile.
+_PLAYER_SCREEN_TILE = 9
+
+
+def _read_tile_collision(pb: PyBoy) -> bytes:
     """Extract a 16x16 grid of collision codes centered on the player.
 
-    See spec Section 4.  Reads the current tileset ID from RAM, looks up the
-    matching collision table from _tilesets.py, then classifies each tile.
+    Reads SCX/SCY hardware registers to locate the player's exact BG tile,
+    then walks ±8 tiles in each axis.  Uses the current tileset's CollisionTable
+    from _tilesets.py to classify each tile ID.
 
-    Returns 256 bytes, row-major: out[dy * 16 + dx] = code at world position
-    (player_x + dx - 8, player_y + dy - 8), with dy/dx in [0, 16).
-    Center cell (dy=8, dx=8, index=136) is the player's own tile.
+    Returns 256 bytes, row-major: out[(dy+8) * 16 + (dx+8)] = code for the
+    tile at tile-offset (dx, dy) from the player, with dx/dy in [-8, +7].
+    Center cell index 8*16+8 = 136 is the player's own standing tile.
+
+    Coordinate system:
+      wXCoord/wYCoord at 0xD362/0xD361 are BLOCK coordinates (1 block = 2 tiles
+      = 16 pixels).  This function bypasses block coords entirely and uses the
+      hardware scroll registers SCX/SCY to locate the player's BG tile directly,
+      so it is correct regardless of scroll position or block/tile scaling.
     """
     from pokemon_planner import _tilesets
 
     tileset_id = pb.memory[ram.CURRENT_TILESET]
     table = _tilesets.COLLISION_TABLES.get(tileset_id, _tilesets.DEFAULT_TABLE)
 
+    # Player's BG tile from hardware scroll registers.
+    scx = pb.memory[_LCD_SCX]
+    scy = pb.memory[_LCD_SCY]
+    player_bg_x = (scx // 8 + _PLAYER_SCREEN_TILE) % 32
+    player_bg_y = (scy // 8 + _PLAYER_SCREEN_TILE) % 32
+
     out = bytearray(TILE_COLLISION_BYTES)
-    for dy in range(16):
-        for dx in range(16):
-            world_x = player_x + dx - 8
-            world_y = player_y + dy - 8
-            tile_id = _read_tile_id_at(pb, world_x, world_y)
-            if tile_id is None:
-                code = _tilesets.COLLISION_UNKNOWN
-            else:
-                code = table.lookup(tile_id)
-            out[dy * 16 + dx] = code
+    for dy in range(-8, 8):
+        for dx in range(-8, 8):
+            bg_x = (player_bg_x + dx) % 32
+            bg_y = (player_bg_y + dy) % 32
+            tile_id = _read_tile_id_at_bg(pb, bg_x, bg_y)
+            code = table.lookup(tile_id)
+            out[(dy + 8) * 16 + (dx + 8)] = code
     return bytes(out)
 
 
@@ -223,10 +240,6 @@ def read_state(pyboy: PyBoy) -> GameState:
         money=_read_bcd(pyboy, ram.MONEY, 3),
         time_played_frames=_read_byte(pyboy, ram.TIME_PLAYED_FRAMES),
         battle=_read_battle(pyboy),
-        tile_collision=_read_tile_collision(
-            pyboy,
-            _read_byte(pyboy, ram.PLAYER_X),
-            _read_byte(pyboy, ram.PLAYER_Y),
-        ),
+        tile_collision=_read_tile_collision(pyboy),
         menu_flags=_read_byte(pyboy, ram.MENU_FLAGS),
     )

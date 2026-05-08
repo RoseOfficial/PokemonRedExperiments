@@ -67,3 +67,30 @@ def test_tile_collision_center_cell_is_player_position(rom_path, init_state_path
         )
     finally:
         pb.close()
+
+
+@pytest.mark.integration
+def test_tile_collision_differs_across_save_states(rom_path, init_state_path, repo_root):
+    """Two different save states should produce different collision matrices.
+
+    Catches scroll-related bugs: if SCX/SCY are ignored, a state with nonzero
+    scroll reads wrong BG tiles and may coincidentally match another state's
+    layout.  The two states here use different map areas, so their matrices must
+    differ.
+    """
+    other_save = repo_root / "has_pokedex_nballs.state"
+    if not other_save.exists():
+        pytest.skip(f"Save state not found: {other_save}")
+
+    pb1 = PokeBoy(rom_path=str(rom_path), save_state_path=str(init_state_path))
+    pb2 = PokeBoy(rom_path=str(rom_path), save_state_path=str(other_save))
+    try:
+        s1 = read_state(pb1.pyboy)
+        s2 = read_state(pb2.pyboy)
+        assert s1.tile_collision != s2.tile_collision, (
+            "init.state and has_pokedex_nballs.state should produce different "
+            "collision matrices — if they're identical, extraction is broken"
+        )
+    finally:
+        pb1.close()
+        pb2.close()
