@@ -95,10 +95,12 @@ def test_save_load_preserves_rng_state(tmp_path: Path, small_config):
     wm = WorldModel(small_config)
     optimizer = torch.optim.Adam(wm.parameters(), lr=1e-3)
 
+    # Set known RNG state
     torch.manual_seed(123)
     np.random.seed(456)
     random.seed(789)
 
+    # Save the state
     state = CheckpointState(
         model=wm, optimizer=optimizer, scheduler=None, scaler=None,
         step=0, ema=None, replay_buffer_position=0,
@@ -106,10 +108,32 @@ def test_save_load_preserves_rng_state(tmp_path: Path, small_config):
     )
     save_checkpoint(tmp_path / "ckpt.pt", state)
 
+    # Capture what the generators produce immediately after the save (i.e. with
+    # the saved-state generators advanced one draw)
+    expected_torch = torch.rand(3)
+    expected_np = np.random.rand(3)
+    expected_py = random.random()
+
+    # Corrupt the RNG state with a different seed
+    torch.manual_seed(999)
+    np.random.seed(999)
+    random.seed(999)
+
+    # Load — should restore the saved-state generators (back to where they were
+    # immediately after save_checkpoint completed)
     wm2 = WorldModel(small_config)
     optimizer2 = torch.optim.Adam(wm2.parameters(), lr=1e-3)
     load_checkpoint(tmp_path / "ckpt.pt", model=wm2, optimizer=optimizer2,
                     scheduler=None, scaler=None)
 
+    # After load, the next draws should match exactly what we saw post-save
     actual_torch = torch.rand(3)
-    assert actual_torch.shape == (3,)
+    actual_np = np.random.rand(3)
+    actual_py = random.random()
+
+    assert torch.equal(actual_torch, expected_torch), \
+        f"torch RNG not restored: expected {expected_torch}, got {actual_torch}"
+    assert np.array_equal(actual_np, expected_np), \
+        f"numpy RNG not restored: expected {expected_np}, got {actual_np}"
+    assert actual_py == expected_py, \
+        f"python RNG not restored: expected {expected_py}, got {actual_py}"

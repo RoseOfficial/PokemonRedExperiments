@@ -20,7 +20,7 @@ import torch
 @dataclass
 class CheckpointState:
     model: torch.nn.Module
-    optimizer: torch.optim.Optimizer
+    optimizer: torch.optim.Optimizer | None
     scheduler: Any | None
     scaler: Any | None
     step: int
@@ -37,7 +37,7 @@ def save_checkpoint(path: Path, state: CheckpointState) -> None:
 
     payload = {
         "model": state.model.state_dict(),
-        "optimizer": state.optimizer.state_dict(),
+        "optimizer": state.optimizer.state_dict() if state.optimizer is not None else None,
         "scheduler": state.scheduler.state_dict() if state.scheduler is not None else None,
         "scaler": state.scaler.state_dict() if state.scaler is not None else None,
         "step": state.step,
@@ -94,7 +94,7 @@ def load_checkpoint(
 
     return CheckpointState(
         model=model,
-        optimizer=optimizer if optimizer is not None else _DummyOpt(),
+        optimizer=optimizer,
         scheduler=scheduler,
         scaler=scaler,
         step=int(payload.get("step", 0)),
@@ -103,13 +103,3 @@ def load_checkpoint(
         wandb_run_id=payload.get("wandb_run_id"),
         config=payload.get("config", {}),
     )
-
-
-class _DummyOpt:
-    """Sentinel returned when caller didn't pass an optimizer to load_checkpoint."""
-
-    def state_dict(self) -> dict:
-        return {}
-
-    def load_state_dict(self, _: dict) -> None:
-        pass
