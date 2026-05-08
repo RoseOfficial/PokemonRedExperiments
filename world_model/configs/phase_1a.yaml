@@ -36,7 +36,7 @@ eval:
   every_n_steps: 2000
   batch_size: 64
   max_batches: 20
-  doD_thresholds:
+  dod_thresholds:
     map_id: 0.80
     x: 0.80
     y: 0.80

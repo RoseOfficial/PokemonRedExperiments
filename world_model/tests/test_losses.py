@@ -46,12 +46,32 @@ def test_targets_from_states_shapes(small_config):
     """targets_from_states extracts per-field tensors from a list of next-states."""
     next_states = [_state(map_id=i, x=i, party_species=0xB0 + i) for i in range(4)]
     targets = targets_from_states(next_states, small_config)
+
+    # Exact key contract
+    assert set(targets.keys()) == {
+        "map_id", "x", "y", "party_size", "party_species", "party_level",
+        "badges", "event_flags", "money", "battle_in", "battle_species",
+        "battle_level", "tile_collision", "menu_flags",
+    }
+
+    # Class-index targets — shape (B,) or (B, num_slots)
     assert targets["map_id"].shape == (4,)
     assert targets["x"].shape == (4,)
+    assert targets["y"].shape == (4,)
     assert targets["party_size"].shape == (4,)
     assert targets["party_species"].shape == (4, small_config.num_party_slots)
+    assert targets["party_level"].shape == (4, small_config.num_party_slots)
+    assert targets["money"].shape == (4,)
+    assert targets["battle_species"].shape == (4,)
+    assert targets["battle_level"].shape == (4,)
+    assert targets["menu_flags"].shape == (4,)
+
+    # Float targets
     assert targets["badges"].shape == (4, 8)
     assert targets["event_flags"].shape == (4, small_config.event_flags_bytes * 8)
+    assert targets["battle_in"].shape == (4,)
+
+    # Categorical-tile-codes target
     assert targets["tile_collision"].shape == (4, 256)
 
 
@@ -73,7 +93,6 @@ def test_compute_joint_loss_returns_finite(small_config):
         next_state_targets=targets,
         reward_targets=rewards,
         mc_return_targets=mc_returns,
-        prev_latent=out["s"].detach(),
         next_latent_target=wm.h(next_states).detach(),
         weights=JointLossWeights(),
     )
@@ -101,7 +120,6 @@ def test_compute_joint_loss_supports_backward(small_config):
     loss, _ = compute_joint_loss(
         wm_out=out, action_targets=actions, next_state_targets=targets,
         reward_targets=rewards, mc_return_targets=mc_returns,
-        prev_latent=out["s"].detach(),
         next_latent_target=wm.h(next_states).detach(),
         weights=JointLossWeights(),
     )

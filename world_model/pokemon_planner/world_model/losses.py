@@ -20,6 +20,7 @@ from torch import Tensor
 
 from pokemon_planner.state import GameState
 from pokemon_planner.world_model.arch import WorldModelConfig
+from pokemon_planner.world_model.tokenizer import _bucket as _bucket_value
 
 
 @dataclass
@@ -63,8 +64,7 @@ def targets_from_states(states: list[GameState], cfg: WorldModelConfig) -> dict[
             for bit_idx in range(8):
                 event_flags[b, byte_idx * 8 + bit_idx] = float((byte_val >> bit_idx) & 1)
 
-    money = collect(lambda s: min(int(s.money * cfg.num_money_buckets // 1_000_000),
-                                   cfg.num_money_buckets - 1))
+    money = collect(lambda s: _bucket_value(s.money, 999_999, cfg.num_money_buckets))
     battle_in = torch.tensor([float(s.battle.in_battle) for s in states], dtype=torch.float32)
     battle_species = collect(lambda s: s.battle.opp_species_id if s.battle.in_battle else 0)
     battle_level = collect(lambda s: s.battle.opp_level if s.battle.in_battle else 0)
@@ -102,7 +102,6 @@ def compute_joint_loss(
     next_state_targets: dict[str, Tensor],
     reward_targets: Tensor,
     mc_return_targets: Tensor,
-    prev_latent: Tensor,
     next_latent_target: Tensor,
     weights: JointLossWeights,
 ) -> tuple[Tensor, dict[str, float]]:
@@ -127,12 +126,7 @@ def compute_joint_loss(
         + F.binary_cross_entropy_with_logits(obs_pred["badges"], targets["badges"])
         + F.binary_cross_entropy_with_logits(obs_pred["event_flags"], targets["event_flags"])
         + F.cross_entropy(obs_pred["money"], targets["money"])
-        + F.binary_cross_entropy_with_logits(
-            obs_pred["battle_in"].unsqueeze(-1) if obs_pred["battle_in"].dim() == 1
-            else obs_pred["battle_in"],
-            targets["battle_in"].unsqueeze(-1) if targets["battle_in"].dim() == 1
-            else targets["battle_in"],
-        )
+        + F.binary_cross_entropy_with_logits(obs_pred["battle_in"], targets["battle_in"])
         + F.cross_entropy(obs_pred["battle_species"], targets["battle_species"])
         + F.cross_entropy(obs_pred["battle_level"], targets["battle_level"])
         + F.cross_entropy(obs_pred["menu_flags"], targets["menu_flags"])
