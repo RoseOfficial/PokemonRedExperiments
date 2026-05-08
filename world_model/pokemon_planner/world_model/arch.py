@@ -5,7 +5,7 @@ Three networks per spec Section 5:
 - DynamicsNet (g): (latent, action) → next_latent + per-field obs preds + reward
 - PredictionNet (f): (latent, goal_emb) → policy logits + value
 
-Total ~67M parameters at default config. fp16-safe; supports gradient
+Total ~57M parameters at default config. fp16-safe; supports gradient
 checkpointing.
 """
 from __future__ import annotations
@@ -91,7 +91,8 @@ def _sinusoidal_pe(seq_len: int, d_model: int) -> Tensor:
         * -(torch.log(torch.tensor(10000.0)) / d_model)
     )
     pe[:, 0::2] = torch.sin(position * div_term)
-    pe[:, 1::2] = torch.cos(position * div_term)
+    # Truncate div_term for cosine slice to handle odd d_model.
+    pe[:, 1::2] = torch.cos(position * div_term[: pe[:, 1::2].shape[1]])
     return pe
 
 
@@ -158,6 +159,11 @@ class DynamicsNet(nn.Module):
             nn.Linear(D, H), nn.GELU(),
             nn.Linear(H, cfg.num_party_slots + 1),
         )
+        # TODO Phase 1b: add party_hp_cur / party_hp_max / party_status / party_moves
+        # heads. Currently the world model only predicts species and level changes
+        # per slot — it cannot predict HP evolution or status condition shifts in
+        # battle. MCTS in the battle subgraph will be blind to those until the
+        # corresponding heads + loss terms exist.
         self.head_party_species = nn.ModuleList([
             nn.Sequential(nn.Linear(D, H), nn.GELU(), nn.Linear(H, cfg.num_species))
             for _ in range(cfg.num_party_slots)

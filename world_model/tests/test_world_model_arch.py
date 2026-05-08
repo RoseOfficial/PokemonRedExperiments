@@ -105,7 +105,7 @@ def test_world_model_no_nan_at_init(small_config):
 
 
 def test_param_count_in_phase_1a_envelope():
-    """Production config should land at ~67M params (allow 50M-90M envelope)."""
+    """Production config should land at ~57M params (allow 50M-90M envelope)."""
     cfg = WorldModelConfig()  # defaults match spec section 5.1-5.5
     wm = WorldModel(cfg)
     n = sum(p.numel() for p in wm.parameters())
@@ -118,3 +118,11 @@ def test_world_model_train_eval_modes(small_config):
     assert wm.training
     wm.eval()
     assert not wm.training
+
+
+def test_sinusoidal_pe_handles_odd_d_model():
+    """Ensures the cosine slice truncation works for odd d_model."""
+    from pokemon_planner.world_model.arch import _sinusoidal_pe
+    pe = _sinusoidal_pe(1, 5)
+    assert pe.shape == (1, 5)
+    assert torch.isfinite(pe).all()
