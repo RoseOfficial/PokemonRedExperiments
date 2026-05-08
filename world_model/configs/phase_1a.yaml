@@ -1,0 +1,59 @@
+# Phase 1a training configuration (per design spec Section 6.8).
+
+model:
+  d_model: 384
+  latent_dim: 256
+  goal_emb_dim: 384
+  action_dim: 9
+  encoder_layers: 12
+  encoder_heads: 8
+  dynamics_layers: 12
+  dynamics_heads: 8
+  prediction_layers: 4
+  prediction_heads: 8
+  ffn_expansion: 4
+  dropout: 0.1
+
+training:
+  batch_size: 32
+  k_unroll: 5
+  lr: 3.0e-4
+  warmup_steps: 2000
+  total_steps: 500000
+  weight_decay: 0.01
+  grad_clip_norm: 1.0
+  ema_decay: 0.999
+  fp16: true
+  gradient_checkpointing: true
+  loss_weights:
+    obs: 1.0
+    value: 0.25
+    policy: 1.0
+    reward: 0.5
+    consistency: 0.1
+
+eval:
+  every_n_steps: 2000
+  batch_size: 64
+  max_batches: 20
+  doD_thresholds:
+    map_id: 0.80
+    x: 0.80
+    y: 0.80
+    party_species_slot_0: 0.80
+
+replay:
+  root: data/replay_buffer
+  source_priorities:
+    demo: 0.3
+  prefetch_workers: 2
+
+checkpoint:
+  save_every_n_steps: 5000
+  keep_last_n: 5
+  milestone_every_n_steps: 100000
+
+wandb:
+  project: pokemon-world-model
+  run_name_prefix: phase1a-wm
+  log_every_n_steps: 100
