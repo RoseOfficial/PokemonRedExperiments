@@ -14,10 +14,10 @@ while ($true) {
 
     if (Test-Path $latest) {
         Write-Host "[go_forever] Resuming from $latest"
-        & python -u scripts/train.py --resume $latest 2>&1 | Tee-Object -FilePath $LogPath -Append
+        & python -u scripts/train.py --resume $latest | Tee-Object -FilePath $LogPath -Append
     } else {
         Write-Host "[go_forever] Fresh start"
-        & python -u scripts/train.py 2>&1 | Tee-Object -FilePath $LogPath -Append
+        & python -u scripts/train.py | Tee-Object -FilePath $LogPath -Append
     }
 
     if ($LASTEXITCODE -eq 0) {

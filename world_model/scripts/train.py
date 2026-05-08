@@ -88,6 +88,8 @@ def main() -> int:
         print("[train.py] Run scripts/bootstrap_demos.py first.")
         return 1
 
+    train_config = build_train_config(cfg["training"])
+
     model_cfg = build_model_config(cfg["model"])
     model = WorldModel(model_cfg)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -96,8 +98,8 @@ def main() -> int:
 
     optimizer = torch.optim.AdamW(
         model.parameters(),
-        lr=float(cfg["training"]["lr"]),
-        weight_decay=float(cfg["training"]["weight_decay"]),
+        lr=train_config.lr,
+        weight_decay=train_config.weight_decay,
     )
 
     start_step = 0
@@ -128,7 +130,6 @@ def main() -> int:
     else:
         print("[train.py] W&B logging disabled (WANDB_API_KEY not set)")
 
-    train_config = build_train_config(cfg["training"])
     args.checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     try:
