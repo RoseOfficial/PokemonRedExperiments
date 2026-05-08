@@ -41,7 +41,10 @@ class GoalEmbedder(nn.Module):
     def __init__(self, num_predicates: int = 6, num_entities: int = 256,
                  embed_dim: int = 384):
         super().__init__()
-        assert embed_dim % 2 == 0, "embed_dim must be even (split between predicate + entity)"
+        if embed_dim % 2 != 0:
+            raise ValueError(
+                f"embed_dim must be even (split between predicate + entity); got {embed_dim}"
+            )
         half = embed_dim // 2
         self.predicate_emb = nn.Embedding(num_predicates, half)
         self.entity_emb = nn.Embedding(num_entities, half)
@@ -49,10 +52,11 @@ class GoalEmbedder(nn.Module):
 
     def forward(self, goal: Atom, entity_lookup: Mapping[str, int]) -> Tensor:
         """Embed a single Atom. Returns (embed_dim,)."""
-        pred_idx = PREDICATE_TO_INDEX.get(goal.predicate_type, 0)
+        pred_idx = PREDICATE_TO_INDEX[goal.predicate_type]   # KeyError on unknown is desired
         ent_idx = entity_lookup.get(goal.entity, UNKNOWN_ENTITY_INDEX)
-        pred_e = self.predicate_emb(torch.tensor(pred_idx))
-        ent_e = self.entity_emb(torch.tensor(ent_idx))
+        device = self.predicate_emb.weight.device
+        pred_e = self.predicate_emb(torch.tensor(pred_idx, device=device))
+        ent_e = self.entity_emb(torch.tensor(ent_idx, device=device))
         return torch.cat([pred_e, ent_e], dim=-1)
 
     def batch(self, goals: list[Atom], entity_lookup: Mapping[str, int]) -> Tensor:
