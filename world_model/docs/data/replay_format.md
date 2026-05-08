@@ -28,6 +28,7 @@ data/replay_buffer/
 | `mc_return` | float32 | Computed at extraction time, gamma=0.997 |
 | `source` | string | Checkpoint name (e.g. "v2_1310720") |
 | `seed` | int64 | RNG seed for the episode (reproducibility) |
+| `priority` | float32 | Sampling weight (Phase 1a: demo=0.3; Phase 1b: divergence=1.0, success=0.7, exploration=0.5, random=0.1) |
 
 ## meta.json
 
